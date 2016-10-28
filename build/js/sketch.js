@@ -145,7 +145,7 @@ function drawTemplate(x0, y0, r0) {
       noStroke(); fill(0);
       text(diagramSource[n_diag], 10, 15);
       stroke(0,0,255); noFill();
-      if (templateVisible) drawSyntonicCircle(x0, y0, r0, phi0, b); 
+      if (templateVisible) drawSyntonicCircle(x0, y0, r0, phi0, a); 
 }
 
 function calcAngle(x0, y0, x, y) {
@@ -187,7 +187,7 @@ function setup() {
   layer.parent("diagram");
   console.log("loaded canvas");
 
-  Synthesizer.init();
+  Synth.init();
 
   tone = new Sound();
   hi00 = 2.13, phi0 = phi00;
