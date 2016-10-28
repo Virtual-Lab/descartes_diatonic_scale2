@@ -1,19 +1,22 @@
 // ------------------------------------------------------------------------------
-//   synth.js creates a synth with oscillators with webaudio and html5 form
+//   synth.js creates a synthesizer with oscillators with webaudio and html5 form
 //   in a div with id = "synth" or as childobject of "body"
 // ------------------------------------------------------------------------------
 
 // initialize Audio -- must be initialized at the beginning
 
-var Synth = {};
+var Synthesizer = {
+  oscMessage : false
+};
 
-Synth.init = function () {
+Synthesizer.init = function () {
 
   console.log('initialize audio ...');
 
   // Fix up prefixing 
   window.AudioContext = window.AudioContext || window.webkitAudioContext;
-  
+  var that = this;
+
   // Create AudioContext (Initialize webaudio Context)
   if (AudioContext) {
     context = new AudioContext();
@@ -25,13 +28,27 @@ Synth.init = function () {
   // Check if createGain is available
   if (!context.createGain) context.createGain = context.createGainNode;
 
-  Synth.master.init();
-  Synth.view.init();
-  Synth.ctl.init();
+  if (this.oscMessage) {
+    this.client = new rhizome.Client();
+
+    this.client.start(
+      function(err) {
+          if (err) {
+            $('body').html('client failed starting : ' + err)
+            throw err
+          }
+          // We want to receive with the adress of '/message'
+          that.client.send('/sys/subscribe', ['/message'])
+      })
+  };
+
+  Synthesizer.master.init();
+  Synthesizer.view.init();
+  Synthesizer.ctl.init();
 
 };
 
-Synth.master = {
+Synthesizer.master = {
 
   init : function() {
 
@@ -46,45 +63,43 @@ Synth.master = {
   }
 }
 
-Synth.set = {
+Synthesizer.set = {
 
   Oscillator : [
-  ['select', 'change', 'Type', ['sine', 'sawtooth', 'triangle', 'square'], 'triangle', 'left', 'Choose type: '],
+  ['select', 'change', 'Type', ['sine', 'sawtooth', 'triangle', 'square'], 'sine', 'left', 'Choose type: '],
   ['button', ['mousedown'], 'Hold', 'hold', '----', ''],
   ['slider', 'change', 'Volume', 0, 1000, 0.2, 'volume: '], 
-  ['slider', 'change', 'Attack', 0, 1000, 0.01, 'attack: '],
-  ['slider', 'change', 'Decay', 0, 1000, 0.1, 'decay: '],
-  ['slider', 'change', 'Sustain', 0, 1000, 1, 'sustain-level: '],
-  ['slider', 'change', 'Release', 0, 1000, 0.2, 'release: ']
+  ['slider', 'change', 'Attack', 0, 1000, 1, 'attack: '],
+  ['slider', 'change', 'Release', 0, 1000, 0.8, 'release: ']
   ], 
   Master : [
-  ['slider', 'change', 'masterVolume', 0, 1000, 0.5, 'volume: '], 
-  ['button', 'mousedown', 'masterCompressor', 'off', '', 'compressor']
+  ['slider', 'change', 'masterVolume', 0, 1000, 0.5, 'volume: ']
+  // ['button', 'mousedown', 'masterCompressor', 'off', '', 'compressor']
   ]
 
 
 }
 
-Synth.view = {
+Synthesizer.view = {
 
 }
 
 
-Synth.view.init = function () {
+Synthesizer.view.init = function () {
     
     if (document.getElementById("synth"))
-      this.synth = document.getElementById("synth");
-    else this.synth = document.getElementsByTagName("BODY")[0];
+      this.synthesizer = document.getElementById("synth");
+    else this.synthesizer = document.getElementsByTagName("BODY")[0];
 
     this.zeile = document.createElement('BR');
-    for (var section in Synth.set)
-      Synth.view.draw(section, Synth.set[section]);
-    //Synth.ctl.init();
+    for (var section in Synthesizer.set)
+      Synthesizer.view.draw(section, Synthesizer.set[section]);
+    //Synthesizer.ctl.init();
 
 }
 
 
-Synth.view.draw = function (name, element) {
+Synthesizer.view.draw = function (name, element) {
 
   var field = document.createElement('fieldset');
   var legend = document.createElement('legend');
@@ -113,12 +128,13 @@ Synth.view.draw = function (name, element) {
 
   };
 
-  // append the section to the synth
-  this.synth.appendChild(field);
+  // append the section to the synthesizer
+  this.synthesizer.appendChild(field);
+  this.synthesizer.appendChild(zeile[0]);
 
 }
 
-Synth.view.select = function (field, settings) { // id, values, labelName
+Synthesizer.view.select = function (field, settings) { // id, values, labelName
 
   var options = [];
   var section = field;
@@ -150,7 +166,7 @@ Synth.view.select = function (field, settings) { // id, values, labelName
 
 }
 
-Synth.view.slider = function (field, settings) { //id, value, min, max, labelName
+Synthesizer.view.slider = function (field, settings) { //id, value, min, max, labelName
 
   var section = field;
   var slider = settings[0];
@@ -175,7 +191,7 @@ Synth.view.slider = function (field, settings) { //id, value, min, max, labelNam
 
 }
 
-Synth.view.button = function (field, settings) { // id, value, labelName
+Synthesizer.view.button = function (field, settings) { // id, value, labelName
 
   var section = field;
   var button = settings[0];
@@ -198,18 +214,18 @@ Synth.view.button = function (field, settings) { // id, value, labelName
 
 }
 
-Synth.ctl = {}; 
+Synthesizer.ctl = {}; 
 
-Synth.ctl.init = function() {
+Synthesizer.ctl.init = function() {
 
   // init Master - Controls
 
-  for (section in Synth.set) {
+  for (section in Synthesizer.set) {
     if (section === "Master") {
 
       console.log('Init ',  section, '...');
       var field = section;
-      var elements = Synth.set[section];
+      var elements = Synthesizer.set[section];
       var settings;
 
       for (var i=0; i < elements.length; i++) {
@@ -223,23 +239,23 @@ Synth.ctl.init = function() {
         settings = settings.slice(2, settings.length);
         // set Eventlistener 
         
-        Synth.view[id].addEventListener(
+        Synthesizer.view[id].addEventListener(
           action,
           function(e) {
             var element = e.target;
             var value;
 
-            if (Synth.view[element.id].type == "range") {  
+            if (Synthesizer.view[element.id].type == "range") {  
               value = parseInt(element.value) / parseInt(element.max);
             } else value = element.value;
 
-            console.log('\nEventlistener: ', Synth.view[element.id].type, 
+            console.log('\nEventlistener: ', Synthesizer.view[element.id].type, 
               '\nto: ', element.id, "Value", value);
-            Synth[element.id](value) 
+            Synthesizer[element.id](value) 
           },
             false);
 
-        Synth[id].set(defaultValue);
+        Synthesizer[id].set(defaultValue);
         console.log("Default Value", id, defaultValue);
 
       } // end of loop through elements
@@ -247,48 +263,48 @@ Synth.ctl.init = function() {
   } // End loop through sections
 }
 
-Synth.masterVolume = function(value) {
+Synthesizer.masterVolume = function(value) {
 
   ctlValue = value * 1;
   viewValue = value * 1000;
 
-  if (Synth.view.masterVolume.value != viewValue) 
-          Synth.view.masterVolume.value = viewValue;
+  if (Synthesizer.view.masterVolume.value != viewValue) 
+          Synthesizer.view.masterVolume.value = viewValue;
 
-  if (Synth.master.volume != ctlValue) 
-    Synth.masterVolume.set(ctlValue);
+  if (Synthesizer.master.volume != ctlValue) 
+    Synthesizer.masterVolume.set(ctlValue);
   
-  // console.log('Volume:', Synth.master.volume);
+  // console.log('Volume:', Synthesizer.master.volume);
 }
 
-Synth.masterVolume.set = function(ctlValue) {
+Synthesizer.masterVolume.set = function(ctlValue) {
   
-  Synth.master.volume = ctlValue;
-  Synth.master.gainNode.gain.value = ctlValue;
-  Synth.masterVolume(ctlValue);
+  Synthesizer.master.volume = ctlValue;
+  Synthesizer.master.gainNode.gain.value = ctlValue;
+  Synthesizer.masterVolume(ctlValue);
 
-  console.log(Synth.master.gainNode.gain.value);
+  console.log(Synthesizer.master.gainNode.gain.value);
 }
 
-Synth.masterCompressor = function(value) {
+Synthesizer.masterCompressor = function(value) {
 
   if (value = "on") {
     this.compressorOn = false;
-    Synth.view.masterCompressor.value = "off";
+    Synthesizer.view.masterCompressor.value = "off";
     console.log('mastercompressor Off');
   } else {
     this.compressorOn = true;
-    Synth.view.masterCompressor.value = "on";
+    Synthesizer.view.masterCompressor.value = "on";
     console.log('mastercompressor On');
   }
 }
 
-Synth.masterCompressor.set = function(value) {
+Synthesizer.masterCompressor.set = function(value) {
 
   if (value = "off") {
-    Synth.masterCompressor("on")
+    Synthesizer.masterCompressor("on")
   } else {
-    Synth.masterCompressor("off")
+    Synthesizer.masterCompressor("off")
   }
 }
 
@@ -311,7 +327,7 @@ var Sound = function (freq, volume) {
   // create Envelope
   this.envelope = context.createGain();
   this.envelope.gain.value = 0;
-  this.envelope.connect(Synth.master.gainNode);
+  this.envelope.connect(Synthesizer.master.gainNode);
   this.adsr();
 
   // optional if additional Envelope is needed:
@@ -366,6 +382,10 @@ Sound.prototype.play = function (freq, time) {
   this.wave.start(0);
   this.active = true;
 
+  if (Synthesizer.oscMessage) {
+    Synthesizer.client.send("/note", [this.freq, this.volume]);
+  }
+
   //if (!Adsr.loop) this.wave.stop(context.currentTime + this.time)
 
 };
@@ -404,6 +424,10 @@ Sound.prototype.stop = function () {
   var volume = this.volume;
   // this stop
   if (!this.hold) {
+    
+    if (Synthesizer.oscMessage) {
+      Synthesizer.client.send("/note", [0, 0]);
+    }; 
 
     //this.envelope.gain.cancelScheduledValues(0);
     //this.envelope.gain.linearRampToValueAtTime(this.volume*this.sustainLevel, time);
@@ -419,13 +443,13 @@ Sound.prototype.stop = function () {
 Sound.prototype.controller = function() {
 
   var that = this;
-  for (section in Synth.set) {
+  for (section in Synthesizer.set) {
 
     if (section === "Oscillator") {
 
       console.log('Init ',  section, '...');
       var field = section;
-      var elements = Synth.set[section];
+      var elements = Synthesizer.set[section];
       var settings;
 
       for (var i=0; i < elements.length; i++) {
@@ -437,6 +461,7 @@ Sound.prototype.controller = function() {
         var ctl = "ctl"+id;
         var set = "set"+id;
         var defaultValue = settings[5];
+        if (type != "slider") defaultValue = settings[4];
 
        
         settings = settings.slice(2, settings.length);
@@ -444,7 +469,7 @@ Sound.prototype.controller = function() {
         // '\naction: ', action, '\nsettings: ', settings);
 
           // Add Eventlistener to form 
-          Synth.view[id].addEventListener(
+          Synthesizer.view[id].addEventListener(
             action,
             function(e) { 
               console.log("action");
@@ -453,11 +478,11 @@ Sound.prototype.controller = function() {
               var id = element.id;
               var value = element.value;
 
-              if (Synth.view[element.id].type == "range") {  
+              if (Synthesizer.view[element.id].type == "range") {  
               value = parseInt(element.value) / parseInt(element.max);
                 } else value = element.value;
 
-            console.log('\nEventlistener: ', Synth.view[id].type, 
+            console.log('\nEventlistener: ', Synthesizer.view[id].type, 
               '\nto: ', id, "Value", value);
             that[ectl](value) 
           }, false);
@@ -477,8 +502,8 @@ Sound.prototype.ctlAttack = function (value) {
   var ctlValue = (value + 0.0005) * 1.995;
   var viewValue = value * 1000;
 
-  if (Synth.view.Attack.value != viewValue) 
-          Synth.view.Attack.value = viewValue;
+  if (Synthesizer.view.Attack.value != viewValue) 
+          Synthesizer.view.Attack.value = viewValue;
 
   if (this.attack != ctlValue) 
     this.attack = ctlValue;
@@ -499,8 +524,8 @@ Sound.prototype.ctlDecay = function (value) {
   var ctlValue = (value + 0.0005) * 1.995;
   var viewValue = value * 1000;
 
-  if (Synth.view.Decay.value != viewValue) 
-          Synth.view.Decay.value = viewValue;
+  if (Synthesizer.view.Decay.value != viewValue) 
+          Synthesizer.view.Decay.value = viewValue;
 
   if (this.decay != ctlValue) 
         this.decay = ctlValue;
@@ -519,8 +544,8 @@ Sound.prototype.ctlSustain = function (value) {
   var ctlValue = value * 2;
   var viewValue = value * 1000;
 
-  if (Synth.view.Sustain.value != viewValue) 
-          Synth.view.Sustain.value = viewValue;
+  if (Synthesizer.view.Sustain.value != viewValue) 
+          Synthesizer.view.Sustain.value = viewValue;
 
   if (this.sustainLevel != ctlValue) 
       this.sustainLevel = ctlValue
@@ -537,8 +562,8 @@ Sound.prototype.ctlRelease = function (value) {
   var ctlValue = (value + 0.0005) * 1.995;
   var viewValue = value * 1000;
 
-  if (Synth.view.Release.value != viewValue) 
-      Synth.view.Release.value = viewValue;
+  if (Synthesizer.view.Release.value != viewValue) 
+      Synthesizer.view.Release.value = viewValue;
 
   if (this.release != ctlValue) 
       this.release = value;
@@ -556,8 +581,8 @@ Sound.prototype.ctlVolume = function (value) {
   var ctlValue = value;
   var viewValue = value * 1000;
   
-  if (Synth.view.Volume.value != viewValue) 
-      Synth.view.Volume.value = viewValue;
+  if (Synthesizer.view.Volume.value != viewValue) 
+      Synthesizer.view.Volume.value = viewValue;
 
   if (this.volume != ctlValue) this.volume = value;
 }
@@ -579,7 +604,7 @@ Sound.prototype.ctlHold = function (value) {
     if (this.active) this.stop();
   };
 
-  Synth.view.Hold.value = value;
+  Synthesizer.view.Hold.value = value;
   console.log('Hold: ', this.hold);
 }
 
@@ -587,19 +612,26 @@ Sound.prototype.setHold = function (value) {
   this.ctlHold(value);
 }
 
-Sound.prototype.trigger = function (value) { 
+Sound.prototype.ctlTrigger = function (value) { 
 
-  if (!this.triggered && this.active) {
+  if (!this.triggered && !this.active) {
     this.triggered = true;
     this.play();
+    Synthesizer.view.Trigger.value = "------"
   }
   else {
     this.stop();
-    this.active = false;
     this.triggered = false;
+    Synthesizer.view.Trigger.value = "trigger"
   };
 
   console.log('Trigger: ', this.triggered);
+}
+
+Sound.prototype.setTrigger = function (value) { 
+
+  this.ctlTrigger(value);
+
 }
 
 Sound.prototype.ctlType = function (value) {
@@ -617,6 +649,16 @@ Sound.prototype.setType = function (value) {
 }
 
 
+Sound.prototype.ctlFrequency = function (value) { 
+
+   this.freq = value;
+
+   if (this.active) {
+    this.wave.frequency.cancelScheduledValues(0);
+    this.wave.frequency.value = this.freq;
+  };
+
+}
 
 Sound.prototype.setFrequency = function (value) { 
 
